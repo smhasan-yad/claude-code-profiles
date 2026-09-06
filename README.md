@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="claude-code-profiles" width="860">
+</p>
+
 # Claude Code profiles
 
 Run Claude Code as **several separate commands**, each wired to a different set of models.
