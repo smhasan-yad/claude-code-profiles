@@ -14,7 +14,8 @@ param([switch] $RemoveConfigs)
 
 $ErrorActionPreference = 'Stop'
 $Root   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Marker = 'omniroute-profiles'
+$Marker = 'claude-code-profiles'
+$Legacy = 'omniroute-profiles'   # pre-rename marker, still cleaned up on upgrade
 
 function Say ($m) { Write-Host $m }
 function Ok  ($m) { Write-Host "   [ok] $m" -ForegroundColor Green }
@@ -28,6 +29,11 @@ Say ""
 $profilePath = $PROFILE.CurrentUserCurrentHost
 if (Test-Path $profilePath) {
     $cur = Get-Content $profilePath -Raw
+    $legacyPattern = "(?ms)^# >>> $Legacy >>>.*?^# <<< $Legacy <<<\r?\n?"
+    if ($cur -match $legacyPattern) {
+        $cur = [regex]::Replace($cur, $legacyPattern, '')
+        Ok "removed the block left by the pre-rename version"
+    }
     $pattern = "(?ms)^# >>> $Marker >>>.*?^# <<< $Marker <<<\r?\n?"
     if ($cur -match $pattern) {
         $new = [regex]::Replace($cur, $pattern, '').TrimEnd() + "`r`n"

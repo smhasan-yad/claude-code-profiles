@@ -34,7 +34,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Root   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Marker = 'omniroute-profiles'
+$Marker = 'claude-code-profiles'
+$Legacy = 'omniroute-profiles'   # pre-rename marker, still cleaned up on upgrade
 
 function Say  ($m) { Write-Host $m }
 function Step ($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
@@ -358,6 +359,11 @@ $profilePath = $PROFILE.CurrentUserCurrentHost
 if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Path $profilePath -Force | Out-Null }
 $cur = Get-Content $profilePath -Raw
 if ($null -eq $cur) { $cur = '' }
+$legacyPattern = "(?ms)^# >>> $Legacy >>>.*?^# <<< $Legacy <<<\r?\n?"
+if ($cur -match $legacyPattern) {
+    $cur = [regex]::Replace($cur, $legacyPattern, '')
+    Ok "removed the block left by the pre-rename version"
+}
 $pattern = "(?ms)^# >>> $Marker >>>.*?^# <<< $Marker <<<\r?\n?"
 if ($cur -match $pattern) {
     $new = [regex]::Replace($cur, $pattern, '')
