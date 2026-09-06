@@ -12,6 +12,14 @@ Each is a real, isolated Claude Code profile with its own history, settings, and
 
 Add, remove, or rename profiles by editing one JSON file and re-running the installer.
 
+### The problem it solves
+
+Claude Code fans work out to subagents on its own. Those subagents use whatever your `haiku` and `sonnet` aliases point at — so if every alias points at your expensive model, **every subagent is expensive**, and you never see it happen.
+
+Measured on one volume task: a single-model setup made **60 paid Opus calls**. The same task with three tiers made **14**. ([full numbers](MEASUREMENTS.md))
+
+You don't need this project to act on that — plain Claude Code has `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `CLAUDE_CODE_SUBAGENT_MODEL`, and pointing either somewhere cheaper captures most of the effect. This just makes it a set of commands you can switch between.
+
 ---
 
 ## Is this the tool you want?
@@ -64,7 +72,7 @@ You don't need this project to act on that: plain Claude Code has `ANTHROPIC_DEF
 ## Requirements
 
 - **Claude Code**, installed and working
-- **Windows** with PowerShell — see [Other platforms](#other-platforms)
+- **Windows**, **macOS**, or **Linux**
 - **At least one provider account.** Several need no signup at all.
 
 Node.js is required for the gateway; the installer offers to install it if missing.
@@ -82,15 +90,19 @@ The gateway runs in the background. It does **not** start at boot on Windows, so
 
 ## Install
 
+**Windows:**
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
+**macOS / Linux:**
+```bash
+./install.sh
+```
+
 It checks prerequisites, installs and starts the gateway, then **pauses** at the dashboard for the one part only you can do: add your providers and create an API key. Most providers are OAuth — you click "sign in", exactly like logging into a website. Then paste the key back and it builds everything and tests each profile end to end.
 
-```powershell
-. $PROFILE
-```
+Then reload your shell — `. $PROFILE` on Windows, `source ~/.zshrc` (or `~/.bashrc`) elsewhere. The installer prints the exact path.
 
 Re-running is safe. It replaces its own managed block rather than stacking duplicates, never overwrites a profile's chat history, and leaves an edited `CLAUDE.md` alone.
 
@@ -100,6 +112,11 @@ Re-running is safe. It replaces its own managed block rather than stacking dupli
 .\install.ps1 -ListModels    # what your account actually exposes, grouped by provider
 .\install.ps1 -TestModels    # call every model in profiles.json, report which are dead
 .\install.ps1 -DryRun        # show what would be built, write nothing
+```
+```bash
+./install.sh --list-models
+./install.sh --test-models
+./install.sh --dry-run
 ```
 
 `-ListModels` then `-TestModels` is the fastest way to fill in `profiles.json` for your own accounts.
@@ -166,7 +183,7 @@ The shipped `profiles.json` is **an example built around one person's accounts**
 **1. See what you actually have.**
 
 ```powershell
-.\install.ps1 -ListModels
+.\install.ps1 -ListModels     # or: ./install.sh --list-models
 ```
 
 Prints every model your providers expose, grouped, e.g. `myprovider/some-model-v2`. Add more providers in the dashboard first if the list looks thin.
@@ -181,7 +198,7 @@ Prints every model your providers expose, grouped, e.g. `myprovider/some-model-v
 **3. Verify they actually work.**
 
 ```powershell
-.\install.ps1 -TestModels
+.\install.ps1 -TestModels     # or: ./install.sh --test-models
 ```
 
 This calls each one once. **Do not skip it.** A router's catalog lists what its providers *advertise*, not what your account can serve — on the setup this was built for, 5 of 18 advertised models returned `INVALID_MODEL_ID` on every request. Because fallback chains retry silently, the only symptom was latency. Remove anything it flags, then run the installer.
@@ -214,8 +231,11 @@ Models you don't have are dropped automatically with a warning, and a profile is
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
+```bash
+./uninstall.sh
+```
 
-Removes the commands, keeps your config folders and history. Add `-RemoveConfigs` to delete those too. Node, the gateway, your logins and your normal `claude` are never touched.
+Removes the commands, keeps your config folders and history. Add `-RemoveConfigs` / `--remove-configs` to delete those too. Node, the gateway, your logins and your normal `claude` are never touched.
 
 ## Troubleshooting
 
@@ -231,9 +251,16 @@ Removes the commands, keeps your config folders and history. Add `-RemoveConfigs
 
 **Check what's active** — `Get-OmniProfile` prints the current config dir and tier mapping.
 
-## Other platforms
+## Platform support
 
-Windows only. The design ports easily — the launchers are ~40 lines of shell that set environment variables and call `claude` — but the bash port hasn't been written or tested, and shipping untested install scripts is worse than shipping none. PRs welcome.
+| | Installer | Shell profile | Tested |
+|---|---|---|---|
+| Windows | `install.ps1` | `Microsoft.PowerShell_profile.ps1` | yes, extensively |
+| macOS / Linux | `install.sh` | `~/.zshrc`, `~/.bashrc`, or `~/.profile` | logic tested under bash 5 on Windows; **not yet run on a real mac or Linux box** |
+
+`install.sh` targets **bash 3.2** (what macOS still ships) — no associative arrays, no `mapfile`. JSON is handled by `node`, which you already need for the gateway, so there is no `jq` dependency.
+
+It was exercised against a live gateway: dry-run, model listing, model testing, a full install into a sandbox `HOME`, launcher sourcing, a real Claude Code round-trip, an idempotent re-install, and uninstall both with and without `--remove-configs`. What has **not** happened is a run on actual macOS or Linux. If you hit something there, an issue with the error text is genuinely useful.
 
 ## Notes
 
