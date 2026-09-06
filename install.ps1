@@ -227,68 +227,31 @@ if ($goodCombos.Count -eq 0) { Die "No combos could be created. Add at least one
 # ---------------------------------------------------------------- profiles
 Step "Writing Claude Code profiles"
 $installed = @()
-$ollamaBase = "http://localhost:$($cfg.gateway.ollamaPort)"
 foreach ($p in $cfg.profiles) {
-    $isOllama = ($p.backend -eq 'ollama')
-
-    if ($isOllama) {
-        # Ollama serves a real Anthropic-compatible /v1/messages, so Claude Code
-        # talks to it directly - no gateway, no combos, nothing leaves the machine.
-        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-            Warn "$($p.command): skipped - ollama is not installed (https://ollama.com)"
-            continue
-        }
-        $pulled = (& ollama list 2>$null) -join "`n"
-        if ($pulled -notmatch [regex]::Escape($p.model)) {
-            Warn "$($p.command): skipped - model '$($p.model)' not pulled. Run: ollama pull $($p.model)"
-            continue
-        }
-    } else {
-        $need = @($p.slots.opus, $p.slots.sonnet, $p.slots.haiku) | Sort-Object -Unique
-        $bad  = @($need | Where-Object { -not $goodCombos.ContainsKey($_) })
-        if ($bad.Count -gt 0) { Warn "$($p.command): skipped - needs combo(s) $($bad -join ', ')"; continue }
-    }
+    $need = @($p.slots.opus, $p.slots.sonnet, $p.slots.haiku) | Sort-Object -Unique
+    $bad  = @($need | Where-Object { -not $goodCombos.ContainsKey($_) })
+    if ($bad.Count -gt 0) { Warn "$($p.command): skipped - needs combo(s) $($bad -join ', ')"; continue }
 
     $dir = Join-Path $HOME $p.dir
     if ($DryRun) {
         $installed += $p
-        if ($isOllama) { $desc = "local ollama, model=$($p.model), ctx=$($p.contextTokens)" }
-        else           { $desc = "opus=$($p.slots.opus) sonnet=$($p.slots.sonnet) haiku=$($p.slots.haiku)" }
-        Ok "would write $($p.command)  ->  ~\$($p.dir)  [$desc]"
+        Ok "would write $($p.command)  ->  ~\$($p.dir)  [opus=$($p.slots.opus) sonnet=$($p.slots.sonnet) haiku=$($p.slots.haiku)]"
         continue
     }
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 
-    if ($isOllama) {
-        $mdl = $p.model
-        $settings = [ordered]@{
-            env = [ordered]@{
-                ANTHROPIC_BASE_URL             = $ollamaBase
-                ANTHROPIC_AUTH_TOKEN           = 'ollama-local-no-auth'   # Ollama ignores it; Claude Code requires one
-                ANTHROPIC_DEFAULT_OPUS_MODEL   = $mdl
-                ANTHROPIC_DEFAULT_SONNET_MODEL = $mdl
-                ANTHROPIC_DEFAULT_HAIKU_MODEL  = $mdl
-                ANTHROPIC_DEFAULT_FABLE_MODEL  = $mdl
-                ANTHROPIC_MODEL                = $mdl
-                # must match OLLAMA_CONTEXT_LENGTH or Ollama silently truncates
-                CLAUDE_CODE_MAX_CONTEXT_TOKENS = "$($p.contextTokens)"
-            }
-            model = $mdl
+    $settings = [ordered]@{
+        env = [ordered]@{
+            ANTHROPIC_BASE_URL                       = $base
+            ANTHROPIC_AUTH_TOKEN                     = $ApiKey
+            ANTHROPIC_DEFAULT_OPUS_MODEL             = $p.slots.opus
+            ANTHROPIC_DEFAULT_SONNET_MODEL           = $p.slots.sonnet
+            ANTHROPIC_DEFAULT_HAIKU_MODEL            = $p.slots.haiku
+            ANTHROPIC_DEFAULT_FABLE_MODEL            = $p.slots.opus
+            ANTHROPIC_MODEL                          = $p.slots.opus
+            CLAUDE_CODE_MAX_CONTEXT_TOKENS           = "$($cfg.gateway.contextTokens)"
         }
-    } else {
-        $settings = [ordered]@{
-            env = [ordered]@{
-                ANTHROPIC_BASE_URL                       = $base
-                ANTHROPIC_AUTH_TOKEN                     = $ApiKey
-                ANTHROPIC_DEFAULT_OPUS_MODEL             = $p.slots.opus
-                ANTHROPIC_DEFAULT_SONNET_MODEL           = $p.slots.sonnet
-                ANTHROPIC_DEFAULT_HAIKU_MODEL            = $p.slots.haiku
-                ANTHROPIC_DEFAULT_FABLE_MODEL            = $p.slots.opus
-                ANTHROPIC_MODEL                          = $p.slots.opus
-                CLAUDE_CODE_MAX_CONTEXT_TOKENS           = "$($cfg.gateway.contextTokens)"
-            }
-            model = $p.slots.opus
-        }
+        model = $p.slots.opus
     }
     Write-Utf8NoBom (Join-Path $dir 'settings.json') ($settings | ConvertTo-Json -Depth 10)
 
@@ -365,24 +328,8 @@ $L.Add('        if (Test-OmniGateway $Url) { return $true }')
 $L.Add('    }')
 $L.Add('    return $false')
 $L.Add('}')
-$L.Add('# Ollama backend for local profiles. OLLAMA_CONTEXT_LENGTH only takes effect')
-$L.Add('# if set BEFORE the server starts, so set it on the way in.')
-$L.Add('function Test-OllamaServer {')
-$L.Add('    param([string]$Url)')
-$L.Add('    try   { Invoke-WebRequest "$Url/api/tags" -TimeoutSec 3 -UseBasicParsing | Out-Null; return $true }')
-$L.Add('    catch { return ($null -ne $_.Exception.Response) }')
-$L.Add('}')
-$L.Add('function Start-OllamaServer {')
-$L.Add('    param([string]$Url,[int]$Ctx)')
-$L.Add('    if (Test-OllamaServer $Url) { return $true }')
-$L.Add('    Write-Host "  starting ollama..." -ForegroundColor DarkGray')
-$L.Add('    Start-Process -FilePath $env:ComSpec -ArgumentList "/c","set OLLAMA_CONTEXT_LENGTH=$Ctx && ollama serve" -WindowStyle Hidden')
-$L.Add('    for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Milliseconds 1000; if (Test-OllamaServer $Url) { return $true } }')
-$L.Add('    return $false')
-$L.Add('}')
 $L.Add('function Invoke-OmniClaude {')
-$L.Add('    param([Parameter(Mandatory)][string]$Dir,[string[]]$Extra,[string[]]$Passthru,')
-$L.Add('           [string]$Backend = "omniroute",[int]$Ctx = 49152)')
+$L.Add('    param([Parameter(Mandatory)][string]$Dir,[string[]]$Extra,[string[]]$Passthru)')
 $L.Add('    Clear-OmniProfile   # entry-clear: a killed run can never leak into another profile')
 $L.Add('    $path = Join-Path $HOME $Dir')
 $L.Add('    $file = Join-Path $path "settings.json"')
@@ -390,11 +337,9 @@ $L.Add('    if (-not (Test-Path $file)) { Write-Error "Missing $file"; return }'
 $L.Add('    $env:CLAUDE_CONFIG_DIR = $path')
 $L.Add('    (Get-Content $file -Raw | ConvertFrom-Json).env.PSObject.Properties |')
 $L.Add('        ForEach-Object { Set-Item "Env:\$($_.Name)" $_.Value }')
-$L.Add('    if ($Backend -eq "ollama") { $up = Start-OllamaServer $env:ANTHROPIC_BASE_URL $Ctx; $how = "ollama serve" }')
-$L.Add('    else                        { $up = Start-OmniGateway  $env:ANTHROPIC_BASE_URL;      $how = "omniroute serve" }')
-$L.Add('    if (-not $up) {')
+$L.Add('    if (-not (Start-OmniGateway $env:ANTHROPIC_BASE_URL)) {')
 $L.Add('        Clear-OmniProfile')
-$L.Add('        Write-Error "Backend not responding. Run ''$how'' in another window to see why."')
+$L.Add('        Write-Error "The model router is not responding. Run ''omniroute serve'' in another window to see why."')
 $L.Add('        return')
 $L.Add('    }')
 $L.Add('    try { & claude @Extra @Passthru } finally { Clear-OmniProfile }')
@@ -402,7 +347,6 @@ $L.Add('}')
 foreach ($p in $installed) {
     if ($p.extraArgs.Count -gt 0) { $extra = " -Extra @('" + ($p.extraArgs -join "','") + "')" } else { $extra = "" }
     $L.Add("# $($p.summary)")
-    if ($p.backend -eq 'ollama') { $extra += " -Backend 'ollama' -Ctx $($p.contextTokens)" }
     $L.Add("function $($p.command) { Invoke-OmniClaude -Dir '$($p.dir)'$extra -Passthru `$args }")
 }
 $L.Add("# <<< $Marker <<<")

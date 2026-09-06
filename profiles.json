@@ -2,8 +2,7 @@
   "$comment": "EXAMPLE built around one person's accounts - it will not match yours. Run 'install.ps1 -ListModels' to see what you actually have, edit the model lists below, then 'install.ps1 -TestModels' to confirm they work. Models you lack are dropped automatically with a warning.",
   "gateway": {
     "port": 20128,
-    "contextTokens": 200000,
-    "ollamaPort": 11434
+    "contextTokens": 200000
   },
   "combos": [
     {
@@ -76,8 +75,7 @@
         "haiku": "free-stack"
       },
       "extraArgs": [],
-      "delegation": false,
-      "backend": "omniroute"
+      "delegation": false
     },
     {
       "command": "claude-tiered",
@@ -89,8 +87,7 @@
         "haiku": "tier-cheap"
       },
       "extraArgs": [],
-      "delegation": true,
-      "backend": "omniroute"
+      "delegation": true
     },
     {
       "command": "claude-pro",
@@ -105,17 +102,6 @@
         "--fallback-model",
         "free-stack"
       ],
-      "delegation": false,
-      "backend": "omniroute"
-    },
-    {
-      "command": "claude-local",
-      "dir": ".claude-local",
-      "summary": "Fully local via Ollama. Nothing leaves the machine.",
-      "backend": "ollama",
-      "model": "qwen3.5:4b",
-      "contextTokens": 49152,
-      "extraArgs": [],
       "delegation": false
     }
   ]

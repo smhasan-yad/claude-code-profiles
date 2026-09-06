@@ -6,7 +6,6 @@ Run Claude Code as **several separate commands**, each wired to a different set 
 claude-free      free providers only, never touches a paid quota
 claude-tiered    delegates by itself: best model plans, cheap models execute
 claude-pro       your paid account first, drops to free when the quota runs out
-claude-local     fully local via Ollama, nothing leaves the machine
 ```
 
 Each is a real, isolated Claude Code profile with its own history, settings, and session list. Your normal `claude` command is left alone.
@@ -128,14 +127,34 @@ Each subagent also gets its **own context window**, so those 40 documents never 
 
 Edit **`profiles.json`**, re-run the installer. That's the whole workflow.
 
-The shipped `profiles.json` is **an example built around one person's accounts** — it will not match yours. Run `-ListModels` to see what you actually have, then edit. Models you don't have are dropped automatically with a warning, and a profile is skipped only if its whole combo is empty, so a partial match still installs cleanly.
+### Connecting your own models
 
-**Change a tier's models** — reorder or replace. First entry is tried first:
+The shipped `profiles.json` is **an example built around one person's accounts** — it will not match yours. The three-step loop:
+
+**1. See what you actually have.**
+
+```powershell
+.\install.ps1 -ListModels
+```
+
+Prints every model your providers expose, grouped, e.g. `myprovider/some-model-v2`. Add more providers in the dashboard first if the list looks thin.
+
+**2. Put them in `profiles.json`.** Each combo is an ordered list; first entry is tried first, the rest are fallbacks:
 
 ```json
 { "name": "tier-cheap", "strategy": "priority",
-  "models": ["provider/fast-model", "provider/backup-model"] }
+  "models": ["fast-provider/small-model", "other-provider/backup-model"] }
 ```
+
+**3. Verify they actually work.**
+
+```powershell
+.\install.ps1 -TestModels
+```
+
+This calls each one once. **Do not skip it.** A router's catalog lists what its providers *advertise*, not what your account can serve — on the setup this was built for, 5 of 18 advertised models returned `INVALID_MODEL_ID` on every request. Because fallback chains retry silently, the only symptom was latency. Remove anything it flags, then run the installer.
+
+Models you don't have are dropped automatically with a warning, and a profile is skipped only if its whole combo ends up empty, so a partial match still installs cleanly.
 
 **Add a profile:**
 
