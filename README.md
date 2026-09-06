@@ -29,6 +29,38 @@ It builds on [OmniRoute](https://www.npmjs.com/package/omniroute) as the gateway
 
 ---
 
+## Does it actually help?
+
+Measured, not claimed — one run each of two tasks, counted from the gateway's own call logs. Full method and caveats in [MEASUREMENTS.md](MEASUREMENTS.md).
+
+**Small task** (read 8 files, build a table):
+
+| | Time | Paid calls | Paid input tokens |
+|---|---|---|---|
+| single expensive model | **21 s** | **3** | **112,884** |
+| `claude-tiered` | 100 s | 6 | 208,855 |
+
+Tiering **lost on every axis**. Not enough work to spread, so the dispatch overhead swamped the saving. Don't use it for small jobs.
+
+**Volume task** (read and judge 20 documents individually):
+
+| | Time | Paid calls | Paid input tokens |
+|---|---|---|---|
+| single expensive model | **155 s** | 60 | 3,305,563 |
+| `claude-tiered` | 529 s | **14** | **678,897** |
+
+4.9x fewer paid tokens, 4.3x fewer paid calls, 3.4x slower.
+
+### Why
+
+Claude Code fans work out to subagents on its own. Those subagents use whatever the `haiku` and `sonnet` aliases point at — so if every alias points at your expensive model, **every subagent is expensive**. On the volume task that meant 60 paid Opus calls instead of 14.
+
+You don't need this project to act on that: plain Claude Code has `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `CLAUDE_CODE_SUBAGENT_MODEL`, and pointing either somewhere cheaper captures most of the effect.
+
+**Single runs on one machine.** Your numbers will differ. And "free" isn't unlimited — the volume task pushed 1.8 M tokens onto free accounts, which have their own limits. Consumption moves; it doesn't disappear.
+
+---
+
 ## Requirements
 
 - **Claude Code**, installed and working
