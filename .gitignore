@@ -1,0 +1,4 @@
+# never commit a profile directory - settings.json holds your API key in plaintext
+.claude-*/
+*.local.json
+*.zip

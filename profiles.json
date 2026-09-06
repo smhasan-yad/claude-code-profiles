@@ -1,0 +1,122 @@
+{
+  "$comment": "EXAMPLE built around one person's accounts - it will not match yours. Run 'install.ps1 -ListModels' to see what you actually have, edit the model lists below, then 'install.ps1 -TestModels' to confirm they work. Models you lack are dropped automatically with a warning.",
+  "gateway": {
+    "port": 20128,
+    "contextTokens": 200000,
+    "ollamaPort": 11434
+  },
+  "combos": [
+    {
+      "name": "free-stack",
+      "strategy": "round-robin",
+      "comment": "Free providers only. Spreads load evenly. Never uses a paid account.",
+      "models": [
+        "antigravity/claude-opus-4-6-thinking-high",
+        "antigravity/claude-sonnet-4-6-high",
+        "kiro/minimax-m2.5",
+        "kiro/claude-sonnet-4.5",
+        "openrouter/minimax/minimax-m3:free"
+      ]
+    },
+    {
+      "name": "pro-first",
+      "strategy": "priority",
+      "comment": "Paid account first. Falls to free only when the paid quota errors out.",
+      "models": [
+        "claude/claude-opus-5-high",
+        "claude/claude-sonnet-5-high",
+        "antigravity/claude-opus-4-6-thinking-high",
+        "kiro/minimax-m2.5",
+        "openrouter/z-ai/glm-5.2:free"
+      ]
+    },
+    {
+      "name": "tier-heavy",
+      "strategy": "priority",
+      "comment": "Thinking tier. Best model you have, with strong free backups.",
+      "models": [
+        "claude/claude-opus-5-high",
+        "antigravity/claude-opus-4-6-thinking-high",
+        "kiro/minimax-m2.5",
+        "openrouter/minimax/minimax-m3:free"
+      ]
+    },
+    {
+      "name": "tier-mid",
+      "strategy": "priority",
+      "comment": "Verification tier. Free first, paid only as a last resort.",
+      "models": [
+        "antigravity/claude-sonnet-4-6-high",
+        "kiro/minimax-m2.5",
+        "kiro/claude-sonnet-4.5",
+        "kiro/glm-5",
+        "claude/claude-sonnet-5-high"
+      ]
+    },
+    {
+      "name": "tier-cheap",
+      "strategy": "priority",
+      "comment": "Grunt-work tier. Free only, fastest first.",
+      "models": [
+        "antigravity/gemini-3.7-flash-high",
+        "kiro/claude-haiku-4.5",
+        "kiro/qwen3-coder-next",
+        "kiro/minimax-m2.1"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "command": "claude-free",
+      "dir": ".claude-free",
+      "summary": "Free only. Never touches a paid quota.",
+      "slots": {
+        "opus": "free-stack",
+        "sonnet": "free-stack",
+        "haiku": "free-stack"
+      },
+      "extraArgs": [],
+      "delegation": false,
+      "backend": "omniroute"
+    },
+    {
+      "command": "claude-tiered",
+      "dir": ".claude-tiered",
+      "summary": "Auto-delegating. Heavy tier plans, cheap tiers execute.",
+      "slots": {
+        "opus": "tier-heavy",
+        "sonnet": "tier-mid",
+        "haiku": "tier-cheap"
+      },
+      "extraArgs": [],
+      "delegation": true,
+      "backend": "omniroute"
+    },
+    {
+      "command": "claude-pro",
+      "dir": ".claude-pro",
+      "summary": "Paid first, free when the quota runs out.",
+      "slots": {
+        "opus": "pro-first",
+        "sonnet": "pro-first",
+        "haiku": "pro-first"
+      },
+      "extraArgs": [
+        "--fallback-model",
+        "free-stack"
+      ],
+      "delegation": false,
+      "backend": "omniroute"
+    },
+    {
+      "command": "claude-local",
+      "dir": ".claude-local",
+      "summary": "Fully local via Ollama. Nothing leaves the machine.",
+      "backend": "ollama",
+      "model": "qwen3.5:4b",
+      "contextTokens": 49152,
+      "extraArgs": [],
+      "delegation": false
+    }
+  ]
+}
